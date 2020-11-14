@@ -10,21 +10,27 @@
         li {
             list-style-type: none;
         }
+
+        .logout {
+            float: right;
+        }
     </style>
 </head>
 
 <body>
+    <div class="logout"><a href="/logout">Se déconnecter</a></div>
+    <div class="pseudo"></div>
     <div class="saisie">
         <input id="msg"><button onclick="send()">Envoyer</button>
     </div>
     <ul id="reception">
 
     </ul>
-    <form action="/connexion">
-        <button>non</button>
+    <form action="/">
+        <button>Accueil</button>
     </form>
 
-    <!-- <script src="/js/chat.js"></script> -->
+    <script src="/js/chat.js"></script>
 
 </body>
 

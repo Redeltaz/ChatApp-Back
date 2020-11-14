@@ -3,17 +3,30 @@ const express = require("express")
 const app = express()
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
-const bodyParser = require('body-parser');
-const {
-    urlencoded
-} = require('body-parser');
-const port = 666;
+const cookieParser = require('cookie-parser')
+const session = require('express-session')
+const port = 8080;
+
+let isSession = false;
 
 app.use(express.static(__dirname + '/public'))
-app.use(bodyParser.urlencoded({
+app.use(express.urlencoded({
     extended: true
 }))
 app.use(express.json())
+app.use(cookieParser())
+app.use(session({
+    secret: 'secret',
+    resave: false,
+    saveUninitialized: false,
+}))
+
+app.get('/test', (req, res) => {
+    db.query(`SELECT * FROM user`, (err, result) => {
+        if (err) throw err;
+        res.send(result);
+    })
+})
 
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/view/index.html')
@@ -27,8 +40,19 @@ app.get('/inscription', (req, res) => {
     res.sendFile(__dirname + '/view/inscription.html')
 })
 
+app.get('/logout', (req, res) => {
+    res.clearCookie('pseudo');
+    req.session.destroy();
+    isSession = false;
+    res.redirect('/')
+})
+
 app.get('/chat', (req, res) => {
-    res.sendFile(__dirname + '/view/chat.html')
+    if (isSession === true) {
+        res.sendFile(__dirname + '/view/chat.html')
+    } else {
+        res.end('<a href="/connexion">Connectez vous d\'abord</a>')
+    }
 })
 
 app.post('/inscription', (req, res) => {
@@ -46,6 +70,8 @@ app.post('/inscription', (req, res) => {
     res.end();
 })
 
+let pseudoSession;
+
 app.post('/connexion', (req, res) => {
     let pseudo = req.body.pseudo
     let mdp = req.body.mdp
@@ -53,6 +79,10 @@ app.post('/connexion', (req, res) => {
         if (err) throw err;
         if (result.length === 1) {
             console.log(`${pseudo} est connecté`)
+            res.cookie('pseudo', `${pseudo}`)
+            req.session.pseudo = pseudo
+            pseudoSession = req.session.pseudo
+            isSession = true;
             res.writeHead(302, {
                 'Location': '/chat',
             });
@@ -69,16 +99,23 @@ app.post('/connexion', (req, res) => {
     })
 })
 
-// io.on('connection', (socket) => {
-//     console.log('a user is connected');
-//     socket.on('disconnect', () => {
-//         console.log('a user is disconnected');
-//     })
-//     socket.on('chat', (msg) => {
-//         console.log(`Message reçu ${msg}`)
-//         io.emit('chat', msg)
-//     })
-// })
+io.on('connection', (socket) => {
+    console.log('a user is connected');
+    socket.on('disconnect', () => {
+        console.log('a user is disconnected');
+    })
+    db.query(`SELECT content, sender FROM message`, (err, result) => {
+        if (err) throw err;
+        io.emit('oldchat', result)
+    })
+    socket.on('chat', (msg) => {
+        db.query(`INSERT INTO message (content, sender) VALUES ('${msg}', '${pseudoSession}')`, (err, result) => {
+            if (err) throw err;
+            console.log(`Message envoyé ${msg}`)
+        });
+        io.emit('chat', msg)
+    })
+})
 
 http.listen(port, () => {
     console.log(`Server listening at port : ${port}`)
